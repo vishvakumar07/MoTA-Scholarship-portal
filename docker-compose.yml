@@ -1,0 +1,151 @@
+# =========================================================
+# MoTA Scholarship System — Docker Compose (Local / SIH)
+# =========================================================
+# Primary deployment: local development and SIH demo.
+# No AWS, no cloud services, no paid infrastructure required.
+#
+# Services:
+#   web      - Next.js frontend        :3000
+#   api      - FastAPI backend         :8000
+#   worker   - Celery document worker  (no port)
+#   postgres - PostgreSQL 15+pgvector  :5432
+#   redis    - Redis 7                 :6379
+#   clamav   - ClamAV malware scanner  :3310
+#
+# Usage:
+#   cp .env.example .env
+#   # Edit .env: set POSTGRES_PASSWORD, JWT_SECRET_KEY, FIELD_ENCRYPTION_KEY
+#   docker compose up --build
+# =========================================================
+
+version: '3.9'
+
+services:
+
+  # ── Next.js Frontend ───────────────────────────────────
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile.dev
+    container_name: mota_web
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./apps/web:/app
+      - web_node_modules:/app/node_modules
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+      - NEXT_PUBLIC_APP_NAME=MoTA Scholarship System
+      - NEXT_PUBLIC_ENVIRONMENT=development
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-change_this_in_production}
+    depends_on:
+      - api
+    networks:
+      - mota_network
+    restart: unless-stopped
+
+  # ── FastAPI Backend ─────────────────────────────────────
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile.dev
+    container_name: mota_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./apps/api:/app
+      - ./storage:/app/storage
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - mota_network
+    restart: unless-stopped
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload --log-level info
+
+  # ── Celery Worker (Document Processing) ─────────────────
+  worker:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile.dev
+    container_name: mota_worker
+    volumes:
+      - ./apps/api:/app
+      - ./storage:/app/storage
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - mota_network
+    restart: unless-stopped
+    command: celery -A tasks.celery_app worker --loglevel=info --concurrency=2 -Q default,documents
+
+  # ── PostgreSQL 15 + pgvector ─────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: mota_postgres
+    environment:
+      POSTGRES_DB: mota_scholarship
+      POSTGRES_USER: mota_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/scripts/init_db.sql:/docker-entrypoint-initdb.d/01_init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - mota_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mota_user -d mota_scholarship"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # ── Redis ────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: mota_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - mota_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ── ClamAV (Malware Scanning) ────────────────────────────
+  # Optional: application degrades gracefully if ClamAV is not healthy.
+  # First start may take several minutes while virus definitions are downloaded.
+  clamav:
+    image: clamav/clamav:latest
+    container_name: mota_clamav
+    ports:
+      - "3310:3310"
+    volumes:
+      - clamav_data:/var/lib/clamav
+    networks:
+      - mota_network
+    restart: unless-stopped
+
+networks:
+  mota_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  clamav_data:
+  web_node_modules:

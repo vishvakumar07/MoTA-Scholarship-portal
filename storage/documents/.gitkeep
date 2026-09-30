@@ -1,0 +1,6 @@
+# Local document storage — applicant uploaded files
+# This directory is gitignored (contents are never committed).
+# The directory structure is tracked via these .gitkeep files.
+#
+# Layout:
+#   documents/{applicant_id}/{application_id}/{document_id}_{filename}

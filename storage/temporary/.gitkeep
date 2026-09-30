@@ -1,0 +1,2 @@
+# In-flight temporary files during processing jobs.
+# Automatically cleaned up after Celery task completion.

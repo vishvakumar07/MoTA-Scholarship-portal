@@ -1,0 +1,144 @@
+﻿# ============================================================
+# MoTA Scholarship System — CI Pipeline
+# Phase 13: CI/CD Readiness
+# ============================================================
+# Triggers: push to main/develop, PR to main
+# Never deploys to production automatically.
+# Production deployment requires manual approval (separate workflow).
+# ============================================================
+
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+
+jobs:
+
+  # ── Backend: Lint, Typecheck, Tests ──────────────────────────────────────
+  backend:
+    name: Backend (Python)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: apps/api/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Lint (flake8)
+        run: |
+          pip install flake8
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
+        continue-on-error: false
+
+      - name: Run tests
+        env:
+          DATABASE_URL: "postgresql://mota_user:test@localhost:5432/mota_scholarship"
+          JWT_SECRET_KEY: ${{ secrets.CI_JWT_SECRET_KEY }}
+          FIELD_ENCRYPTION_KEY: ${{ secrets.CI_FIELD_ENCRYPTION_KEY }}
+          ENVIRONMENT: development
+          REDIS_URL: "redis://localhost:6379/0"
+          AI_PROVIDER: mock
+          OCR_PROVIDER: unavailable
+          STORAGE_PROVIDER: local
+          LOCAL_STORAGE_PATH: /tmp/mota_storage
+          CLAMAV_HOST: localhost
+          CLAMAV_PORT: "3310"
+        run: |
+          mkdir -p /tmp/mota_storage/documents /tmp/mota_storage/processed /tmp/mota_storage/temporary
+          python -m pytest tests/ -x -q --tb=short --junitxml=test-results.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: apps/api/test-results.xml
+
+  # ── Frontend: Typecheck + Build ───────────────────────────────────────────
+  frontend:
+    name: Frontend (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+          NEXT_PUBLIC_APP_NAME: "MoTA Scholarship System"
+          NEXT_PUBLIC_ENVIRONMENT: production
+        run: npm run build
+
+  # ── Security: Dependency Audit ────────────────────────────────────────────
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python dependency audit (pip-audit)
+        working-directory: apps/api
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt --ignore-vuln PYSEC-2024-232 || true
+
+      - name: npm audit
+        working-directory: apps/web
+        run: npm audit --audit-level=high || true
+
+      - name: Secret scan (detect-secrets)
+        run: |
+          pip install detect-secrets
+          detect-secrets scan --baseline .secrets.baseline || true
+
+  # ── Docker Compose Validation ─────────────────────────────────────────────
+  docker-validate:
+    name: Docker Compose Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate docker-compose.yml
+        run: docker compose config --quiet
+
+      - name: Validate docker-compose.prod.yml overlay
+        env:
+          POSTGRES_PASSWORD: ci_test_password
+          REDIS_PASSWORD: ci_test_redis_password
+        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml config --quiet

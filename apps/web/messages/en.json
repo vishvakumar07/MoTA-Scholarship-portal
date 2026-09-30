@@ -1,0 +1,38 @@
+{
+  "ministry": {
+    "title": "Ministry of Tribal Affairs",
+    "gov": "Government of India",
+    "portal_name": "AI-Enabled Scholarship & Fellowship Portal",
+    "tagline": "Empowering Scheduled Tribe Youth Through Accessible Higher Education"
+  },
+  "nav": {
+    "home": "Home",
+    "schemes": "Schemes",
+    "eligibility": "Eligibility Check",
+    "login": "Login",
+    "register": "Register",
+    "dashboard": "Dashboard",
+    "logout": "Logout"
+  },
+  "hero": {
+    "badge": "Digital India & Smart India Hackathon Prototype",
+    "title": "Empowering Tribal Scholars with Intelligent Governance",
+    "subtitle": "Discover, apply, and track scholarships and fellowships offered by the Ministry of Tribal Affairs with automated verification, transparent workflows, and real-time DBT tracking.",
+    "explore_schemes": "Explore Schemes",
+    "check_eligibility": "Check Eligibility"
+  },
+  "auth": {
+    "welcome_back": "Welcome Back",
+    "login_sub": "Access your MoTA scholarship application portal",
+    "register_title": "Create Applicant Account",
+    "register_sub": "Register using your email and mobile number to begin applying",
+    "email_label": "Email Address",
+    "password_label": "Password",
+    "fullname_label": "Full Name (as per certificates)",
+    "phone_label": "Mobile Number",
+    "signin_btn": "Sign In",
+    "signup_btn": "Create Account",
+    "no_account": "Don't have an account?",
+    "have_account": "Already registered?"
+  }
+}

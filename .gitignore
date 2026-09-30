@@ -1,0 +1,91 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+build/
+.npm
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment & secrets — NEVER commit these
+.env
+.env.local
+.env.*.local
+*.env.local
+apps/web/.env.local
+
+# Local document storage — NEVER commit applicant documents
+storage/documents/*
+storage/processed/*
+storage/temporary/*
+storage/exports/*
+# Keep directory structure tracked
+!storage/documents/.gitkeep
+!storage/processed/.gitkeep
+!storage/temporary/.gitkeep
+!storage/exports/.gitkeep
+
+# Database
+*.db
+*.sqlite3
+*.sqlite
+
+# Docker override files (keep docker-compose.yml, ignore local overrides)
+docker-compose.override.yml
+docker-compose.local.yml
+
+# Logs
+*.log
+logs/
+celerybeat-schedule
+celerybeat.pid
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Coverage
+.coverage
+htmlcov/
+coverage.xml
+*.coveragerc
+
+# Alembic generated (keep migration files, ignore cache)
+apps/api/alembic/__pycache__/
+apps/api/alembic/versions/__pycache__/
+
+# AI output cache (not committed)
+.ai_cache/
+
+# OS
+.DS_Store
+desktop.ini

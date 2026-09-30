@@ -1,0 +1,106 @@
+﻿# ============================================================
+# MoTA Scholarship System — Production Docker Compose Override
+# Phase 13
+# ============================================================
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# This overlay:
+#  - Uses production Dockerfiles (non-root, gunicorn, no --reload)
+#  - Removes host-volume code mounts (static image)
+#  - Adds resource limits
+#  - Disables direct PostgreSQL/Redis host port exposure
+#  - Enables restart: always
+#  - Sets ENVIRONMENT=production
+# ============================================================
+
+version: '3.9'
+
+services:
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile.prod
+    volumes: []          # No code volume mount in production
+    environment:
+      - NEXT_PUBLIC_ENVIRONMENT=production
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile.prod
+    volumes:
+      - ./storage:/app/storage  # Document storage still mounted
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=WARNING
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '2.0'
+    # Override dev command (prod Dockerfile already sets gunicorn CMD)
+    command: []
+
+  worker:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile.prod
+    volumes:
+      - ./storage:/app/storage
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=WARNING
+    command:
+      - celery
+      - -A
+      - tasks.celery_app
+      - worker
+      - --loglevel=warning
+      - --concurrency=4
+      - -Q
+      - default,documents
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+
+  postgres:
+    # Do NOT expose PostgreSQL port to host in production
+    ports: []
+    environment:
+      POSTGRES_DB: mota_scholarship
+      POSTGRES_USER: mota_user
+      POSTGRES_PASSWORD: 
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+    restart: always
+
+  redis:
+    # Do NOT expose Redis port to host in production
+    ports: []
+    command: ["redis-server", "--requirepass", "", "--appendonly", "yes"]
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+    restart: always
+
+  clamav:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
